@@ -1,0 +1,9 @@
+table {
+ border-collapse: collapse;
+}
+.header th {
+    padding: 5px;
+}
+tr {
+    border:1px solid #5c5c5c;
+}
