@@ -20,12 +20,33 @@ export class Excel extends React.Component {
         };
 
         this.preSearchData = null;
+        this.log = [clone(this.state)]
+        this.replayID = null;
 
         this.sort = this.sort.bind(this);
         this.showEditor = this.showEditor.bind(this);
         this.save = this.save.bind(this);
         this.toggleSearch = this.toggleSearch.bind(this);
         this.search = this.search.bind(this);
+        this.reply = this.reply.bind(this);
+        this.logSetState = this.logSetState.bind(this);
+        this.keydownHandler= this.keydownHandler.bind(this);
+
+    }
+
+    keydownHandler(e) {
+        if (e.altKey && e.shiftKey && e.keyCode === 82) {
+            // ALT+SHIFT+R(eplay)
+            this.reply()
+        }
+    }
+    componentDidMount() {
+        document.addEventListener('keydown', this.keydownHandler)
+    }
+
+    componentWillUnmount() {
+        document.removeEventListener('keydown', this.keydownHandler);
+        clearInterval(this.replayID);
     }
 
     sort(e) {
@@ -45,7 +66,7 @@ export class Excel extends React.Component {
                     ? 1
                     : -1;
         });
-        this.setState({
+        this.logSetState({
             data,
             sortby: column,
             descending,
@@ -53,7 +74,7 @@ export class Excel extends React.Component {
     }
 
     showEditor(e) {
-        this.setState({
+        this.logSetState({
             edit: {
                 row: parseInt(e.target.parentNode.dataset.row, 10),
                 column: e.target.cellIndex,
@@ -82,14 +103,14 @@ export class Excel extends React.Component {
 
     toggleSearch() {
         if (this.state.search) {
-            this.setState({
+            this.logSetState({
                 data: this.preSearchData,
                 search: false,
             });
             this.preSearchData = null;
         } else {
             this.preSearchData = this.state.data;
-            this.setState({
+            this.logSetState({
                 search: true,
             });
         }
@@ -98,14 +119,35 @@ export class Excel extends React.Component {
     search(e) {
         const needle = e.target.value.toLowerCase();
         if (!needle) {
-            this.setState({data: this.preSearchData});
+            this.logSetState({data: this.preSearchData});
             return;
         }
         const idx = e.target.dataset.idx;
         const searchdata = this.preSearchData.filter((row) => {
             return row[idx].toString().toLowerCase().indexOf(needle) > -1;
         });
-        this.setState({data: searchdata});
+        this.logSetState({data: searchdata});
+    }
+
+    logSetState(newState) {
+        // запомните старое состояние в клоне
+        this.log.push(clone(newState));
+        // теперь установите его
+        this.setState(newState)
+    }
+
+    reply() {
+        if (this.log.length === 1) {
+            console.warn('No state changes to replay yet')
+            return;
+        }
+        let idx = -1;
+        const interval = setInterval(() => {
+            if (++idx === this.log.length - 1) {
+                clearInterval(interval);
+            }
+            this.setState(this.log[idx])
+        }, 1000)
     }
 
     render() {
@@ -113,7 +155,7 @@ export class Excel extends React.Component {
             <tr onChange={this.search}>
                 {this.props.headers.map((_, idx) => (
                     <td key={idx}>
-                        <input type="text" data-idx={idx} />
+                        <input type="text" data-idx={idx}/>
                     </td>
                 ))}
             </tr>
@@ -154,7 +196,7 @@ export class Excel extends React.Component {
                                     ) {
                                         cell = (
                                             <form onSubmit={this.save}>
-                                                <input type="text" defaultValue={cell} />
+                                                <input type="text" defaultValue={cell}/>
                                             </form>
                                         );
                                     }
