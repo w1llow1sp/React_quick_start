@@ -20,7 +20,8 @@ export class Excel extends React.Component {
         };
 
         this.preSearchData = null;
-        this.log = [clone(this.state)]
+        // log the initial state
+        this.log = [clone(this.state)];
         this.replayID = null;
 
         this.sort = this.sort.bind(this);
@@ -28,20 +29,22 @@ export class Excel extends React.Component {
         this.save = this.save.bind(this);
         this.toggleSearch = this.toggleSearch.bind(this);
         this.search = this.search.bind(this);
-        this.reply = this.reply.bind(this);
+        this.replay = this.replay.bind(this);
         this.logSetState = this.logSetState.bind(this);
-        this.keydownHandler= this.keydownHandler.bind(this);
-
+        this.keydownHandler = this.keydownHandler.bind(this);
+        this.downloadJSON = this.download.bind(this, 'json');
+        this.downloadCSV = this.download.bind(this, 'csv');
     }
 
     keydownHandler(e) {
         if (e.altKey && e.shiftKey && e.keyCode === 82) {
             // ALT+SHIFT+R(eplay)
-            this.reply()
+            this.replay();
         }
     }
+
     componentDidMount() {
-        document.addEventListener('keydown', this.keydownHandler)
+        document.addEventListener('keydown', this.keydownHandler);
     }
 
     componentWillUnmount() {
@@ -130,24 +133,51 @@ export class Excel extends React.Component {
     }
 
     logSetState(newState) {
-        // запомните старое состояние в клоне
+        // remember the old state in a clone
         this.log.push(clone(newState));
-        // теперь установите его
-        this.setState(newState)
+        // now set it
+        this.setState(newState);
     }
 
-    reply() {
+    replay() {
         if (this.log.length === 1) {
-            console.warn('No state changes to replay yet')
+            console.warn('No state changes to replay yet');
             return;
         }
         let idx = -1;
-        const interval = setInterval(() => {
+        this.replayID = setInterval(() => {
             if (++idx === this.log.length - 1) {
-                clearInterval(interval);
+                // the end
+                clearInterval(this.replayID);
             }
-            this.setState(this.log[idx])
-        }, 1000)
+            this.setState(this.log[idx]);
+        }, 1000);
+    }
+
+    download(format, ev) {
+        const data = clone(this.state.data).map((row) => {
+            row.pop(); // drop the last column, the recordId
+            return row;
+        });
+        const contents =
+            format === 'json'
+                ? JSON.stringify(data, null, '  ')
+                : data.reduce((result, row) => {
+                    return (
+                        result +
+                        row.reduce((rowcontent, cellcontent, idx) => {
+                            const cell = cellcontent.replace(/"/g, '""');
+                            const delimiter = idx < row.length - 1 ? ',' : '';
+                            return `${rowcontent}"${cellcontent}"${delimiter}`;
+                        }, '') +
+                        '\n'
+                    );
+                }, '');
+
+        const URL = window.URL || window.webkitURL;
+        const blob = new Blob([contents], {type: 'text/' + format});
+        ev.target.href = URL.createObjectURL(blob);
+        ev.target.download = 'data.' + format;
     }
 
     render() {
@@ -155,7 +185,7 @@ export class Excel extends React.Component {
             <tr onChange={this.search}>
                 {this.props.headers.map((_, idx) => (
                     <td key={idx}>
-                        <input type="text" data-idx={idx}/>
+                        <input type="text" data-idx={idx} />
                     </td>
                 ))}
             </tr>
@@ -166,6 +196,12 @@ export class Excel extends React.Component {
                     <button onClick={this.toggleSearch}>
                         {this.state.search ? 'Hide search' : 'Show search'}
                     </button>
+                    <a href="data.json" onClick={this.downloadJSON}>
+                        Export JSON
+                    </a>
+                    <a href="data.csv" onClick={this.downloadCSV}>
+                        Export CSV
+                    </a>
                 </div>
                 <table>
                     <thead onClick={this.sort}>
@@ -180,7 +216,7 @@ export class Excel extends React.Component {
                     </thead>
                     <tbody onDoubleClick={this.showEditor}>
                     {searchRow}
-                    {this.state.data.map((row, rowidx) => {
+                    {this.state.data.map((row) => {
                         const recordId = row[row.length - 1];
                         return (
                             <tr key={recordId} data-row={recordId}>
@@ -196,7 +232,7 @@ export class Excel extends React.Component {
                                     ) {
                                         cell = (
                                             <form onSubmit={this.save}>
-                                                <input type="text" defaultValue={cell}/>
+                                                <input type="text" defaultValue={cell} />
                                             </form>
                                         );
                                     }
@@ -210,5 +246,5 @@ export class Excel extends React.Component {
             </div>
         );
     }
-
 }
+
