@@ -1,4 +1,3 @@
-
 import './App.css'
 import {headers, data} from "./const/tablesData.js";
 import {Excel} from "./components/Excel.jsx";
