@@ -45,6 +45,15 @@ export class Excel extends React.Component {
 
     componentDidMount() {
         document.addEventListener('keydown', this.keydownHandler);
+        fetch('https://www.phpied.com/files/reactbook/table-data.json')
+            .then((respose) => respose.json())
+            .then((initData) => {
+                const data = clone(initData).map((row, idx) => {
+                    row.push(idx)
+                    return row
+                })
+                this.setState({data})
+            })
     }
 
     componentWillUnmount() {
@@ -185,7 +194,7 @@ export class Excel extends React.Component {
             <tr onChange={this.search}>
                 {this.props.headers.map((_, idx) => (
                     <td key={idx}>
-                        <input type="text" data-idx={idx} />
+                        <input type="text" data-idx={idx}/>
                     </td>
                 ))}
             </tr>
@@ -214,34 +223,46 @@ export class Excel extends React.Component {
                         })}
                     </tr>
                     </thead>
-                    <tbody onDoubleClick={this.showEditor}>
-                    {searchRow}
-                    {this.state.data.map((row) => {
-                        const recordId = row[row.length - 1];
-                        return (
-                            <tr key={recordId} data-row={recordId}>
-                                {row.map((cell, columnidx) => {
-                                    if (columnidx === this.props.headers.length) {
-                                        return;
-                                    }
-                                    const edit = this.state.edit;
-                                    if (
-                                        edit &&
-                                        edit.row === recordId &&
-                                        edit.column === columnidx
-                                    ) {
-                                        cell = (
-                                            <form onSubmit={this.save}>
-                                                <input type="text" defaultValue={cell} />
-                                            </form>
-                                        );
-                                    }
-                                    return <td key={columnidx}>{cell}</td>;
-                                })}
+                    {this.state.data.length === 0 ?
+                        (
+                            <tbody>
+                            <tr>
+                                <td colSpan={this.props.headers.length}>
+                                    Loading data...
+                                </td>
                             </tr>
-                        );
-                    })}
-                    </tbody>
+                            </tbody>
+                        )
+                        : (
+                            <tbody onDoubleClick={this.showEditor}>
+                            {searchRow}
+                            {this.state.data.map((row) => {
+                                const recordId = row[row.length - 1];
+                                return (
+                                    <tr key={recordId} data-row={recordId}>
+                                        {row.map((cell, columnidx) => {
+                                            if (columnidx === this.props.headers.length) {
+                                                return;
+                                            }
+                                            const edit = this.state.edit;
+                                            if (
+                                                edit &&
+                                                edit.row === recordId &&
+                                                edit.column === columnidx
+                                            ) {
+                                                cell = (
+                                                    <form onSubmit={this.save}>
+                                                        <input type="text" defaultValue={cell}/>
+                                                    </form>
+                                                );
+                                            }
+                                            return <td key={columnidx}>{cell}</td>;
+                                        })}
+                                    </tr>
+                                );
+                            })}
+                            </tbody>
+                        )}
                 </table>
             </div>
         );
