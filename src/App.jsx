@@ -1,14 +1,21 @@
-
 import './App.css'
-import {headers, data} from "./const/tablesData.js";
-import {Excel} from "./components/Excel.jsx";
+import {headers,data } from "./const/tablesData.js";
+import {ExcelFuncComponent} from "./components/funcComponent/ExcelFuncComponent.jsx";
+import {ExcelComponent} from "./chapter 6/component/ExcelComponent.jsx";
 
 function App() {
-  return (
-    <>
-     <Excel headers={headers} initialData={data}/>
-    </>
-  )
+    return (
+        <>
+            <ExcelComponent
+                headers={['Name', 'Year']}
+                initialData={[
+                    ['Charles', '1859'],
+                    ['Antoine', '1943'],
+                ]}/>
+            {/*<Excel headers={headers} initialData={[]}/>*/}
+
+        </>
+    )
 }
 
 export default App

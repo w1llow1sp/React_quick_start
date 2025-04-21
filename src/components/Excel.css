@@ -1,3 +1,13 @@
+.search_button {
+    display: flex;
+    margin-bottom: 10px;
+    background:#535bf2;
+}
+.toolbar {
+    display: flex;
+    justify-content: space-between;
+}
+
 table {
  border-collapse: collapse;
 }
