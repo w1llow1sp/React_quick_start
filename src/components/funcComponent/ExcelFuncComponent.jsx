@@ -1,28 +1,15 @@
 import PropTypes from "prop-types";
-import React, {useEffect, useState} from "react";
+import React, {useEffect, useReducer, useState} from "react";
 
 function clone(o) {
     return JSON.parse(JSON.stringify(o));
 }
 
-
-export const ExcelFuncComponent = ({headers, initialData}) => {
-    const [data, setData] = useState(
-        clone(initialData).map((row, idx) => row.concat(idx)),
-    );
-    const [sorting, setSorting] = useState({
-        column: null,
-        descending: false,
-    });
-    const [edit, setEdit] = useState(null);
-    const [search, setSearch] = useState(false);
-    const [preSearchData, setPreSearchData] = useState(null);
-
-    function sort(e) {
-        const column = e.target.cellIndex;
-        const dataCopy = clone(data);
-        const descending = sorting.column === column && !sorting.descending;
-        dataCopy.sort((a, b) => {
+let originalData = null;
+function reducer(data, action) {
+    if (action.type === 'sort') {
+        const {column, descending} = action.payload;
+        return clone(data).sort((a, b) => {
             if (a[column] === b[column]) {
                 return 0;
             }
@@ -34,8 +21,47 @@ export const ExcelFuncComponent = ({headers, initialData}) => {
                     ? 1
                     : -1;
         });
-        setData(dataCopy);
+    }
+    if (action.type === 'save') {
+        data[action.payload.edit.row][action.payload.edit.column] =
+            action.payload.value;
+        return data;
+    }
+    if (action.type === 'startSearching') {
+        originalData = data;
+        return originalData;
+    }
+    if (action.type === 'doneSearching') {
+        return originalData;
+    }
+    if (action.type === 'search') {
+        return originalData.filter((row) => {
+            return (
+                row[action.payload.column]
+                    .toString()
+                    .toLowerCase()
+                    .indexOf(action.payload.needle.toLowerCase()) > -1
+            );
+        });
+    }
+}
+
+
+
+export const ExcelFuncComponent = ({headers, initialData}) => {
+    const [data, dispatch] = useReducer(reducer, initialData);
+    const [sorting, setSorting] = useState({
+        column: null,
+        descending: false,
+    });
+    const [edit, setEdit] = useState(null);
+    const [search, setSearch] = useState(false);
+
+    function sort(e) {
+        const column = e.target.cellIndex;
+        const descending = sorting.column === column && !sorting.descending;
         setSorting({column, descending});
+        dispatch({type: 'sort', payload: {column, descending}});
     }
 
     function showEditor(e) {
@@ -47,66 +73,45 @@ export const ExcelFuncComponent = ({headers, initialData}) => {
 
     function save(e) {
         e.preventDefault();
-        const input = e.target.firstChild;
-        const dataCopy = clone(data).map((row) => {
-            if (row[row.length - 1] === edit.row) {
-                row[edit.column] = input.value;
-            }
-            return row;
+        const value = e.target.firstChild.value;
+        dispatch({
+            type: 'save',
+            payload: {
+                edit,
+                value,
+            },
         });
         setEdit(null);
-        setData(dataCopy);
-        const preSearch = clone(preSearchData);
-        preSearch[edit.row][edit.column] = input.value;
-        setPreSearchData(preSearch);
     }
 
     function toggleSearch() {
-        if (search) {
-            setData(preSearchData);
-            setSearch(false);
-            setPreSearchData(null);
+        if (!search) {
+            dispatch({
+                type: 'startSearching',
+            });
         } else {
-            setPreSearchData(data);
-            setSearch(true);
+            dispatch({
+                type: 'doneSearching',
+            });
         }
+        setSearch(!search);
     }
 
     function filter(e) {
-        const needle = e.target.value.toLowerCase();
-        if (!needle) {
-            setData(preSearchData);
-            return;
-        }
-        const idx = e.target.dataset.idx;
-        const searchdata = preSearchData.filter((row) => {
-            return row[idx].toString().toLowerCase().indexOf(needle) > -1;
+        const needle = e.target.value;
+        const column = e.target.dataset.idx;
+        dispatch({
+            type: 'search',
+            payload: {needle, column},
         });
-        setData(searchdata);
+        setEdit(null);
     }
-
-    useEffect(() => {
-        document.addEventListener('keydown', this.keydownHandler);
-        fetch('https://www.phpied.com/files/reactbook/table-data.json')
-            .then((respose) => respose.json())
-            .then((initData) => {
-                const data = clone(initData).map((row, idx) => {
-                    row.push(idx)
-                    return row
-                })
-                this.setState({data})
-            })
-        return () => {
-            document.removeEventListener('keydown', this.keydownHandler);
-            clearInterval(this.replayID);
-        }
-    }, []);
 
     const searchRow = !search ? null : (
         <tr onChange={filter}>
             {headers.map((_, idx) => (
                 <td key={idx}>
-                    <input type="text" data-idx={idx}/>
+                    <input type="text" data-idx={idx} />
                 </td>
             ))}
         </tr>
@@ -132,30 +137,24 @@ export const ExcelFuncComponent = ({headers, initialData}) => {
                 </thead>
                 <tbody onDoubleClick={showEditor}>
                 {searchRow}
-                {data.map((row) => {
-                    const recordId = row[row.length - 1];
-                    return (
-                        <tr key={recordId} data-row={recordId}>
-                            {row.map((cell, columnidx) => {
-                                if (columnidx === headers.length) {
-                                    return;
-                                }
-                                if (
-                                    edit &&
-                                    edit.row === recordId &&
-                                    edit.column === columnidx
-                                ) {
-                                    cell = (
-                                        <form onSubmit={save}>
-                                            <input type="text" defaultValue={cell}/>
-                                        </form>
-                                    );
-                                }
-                                return <td key={columnidx}>{cell}</td>;
-                            })}
-                        </tr>
-                    );
-                })}
+                {data.map((row, rowidx) => (
+                    <tr key={rowidx} data-row={rowidx}>
+                        {row.map((cell, columnidx) => {
+                            if (
+                                edit &&
+                                edit.row === rowidx &&
+                                edit.column === columnidx
+                            ) {
+                                cell = (
+                                    <form onSubmit={save}>
+                                        <input type="text" defaultValue={cell} />
+                                    </form>
+                                );
+                            }
+                            return <td key={columnidx}>{cell}</td>;
+                        })}
+                    </tr>
+                ))}
                 </tbody>
             </table>
         </div>
